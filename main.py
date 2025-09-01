@@ -1,8 +1,10 @@
+from matplotlib import pyplot as plt
 from nicegui import ui
 import numpy as np
 import cv2
 from copy import copy
 import pandas as pd
+from pyproj import Transformer
 from georef.operators import Georef
 import georaster
 import tifffile
@@ -47,6 +49,7 @@ def read_remarkable_pts(f_corresp_pts_remarquables):
     df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
     df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
 
+    # remarkable pts xyz from pix, and uv from geo
     xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
         compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
                                              np.array(
@@ -54,7 +57,7 @@ def read_remarkable_pts(f_corresp_pts_remarquables):
                                              georef_params))
     return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
 
-def read_tif_mnt(f_mnt):
+def read_tif_mnt(f_mnt, epsg_mnt, georef_params):
 
     # extent of tif file
     band1 = georaster.SingleBandRaster(f_mnt, load_data=False)
@@ -66,8 +69,22 @@ def read_tif_mnt(f_mnt):
     # create masked array
     data = np.ma.array(data, mask=data < -32760)
 
-    return data, band1.extent
+    # get x, y grid coordinates
+    x = np.linspace(xmin, xmax, data.shape[1])
+    y = np.linspace(ymax, ymin, data.shape[0])
+    x, y = np.meshgrid(x, y)
+    x = x[~data.mask].flatten()
+    y = y[~data.mask].flatten()
+    transformer = Transformer.from_crs(epsg_mnt, georef_params.georef_local_srs.horizontal_srs.srid, always_xy=True)
+    x, y = transformer.transform(x, y)
 
+    # compress data
+    data = data.compressed().flatten()
+
+    # mnt uv from geo
+    u, v = world_2_pix(np.vstack([x, y, data]), georef_params)
+
+    return data, x, y, u, v
 
 def pix_2_world(uvz, georef_params):
     # convert pix points to geo local
@@ -118,10 +135,20 @@ def toggle_scatter_remarkables():
     plot.update()
 
 def toggle_mnt():
-    global imshow_mnt
-    if imshow_mnt is None:
-        imshow_mnt = ax2.imshow(data, extent=(xmin, xmax, ymin, ymax), aspect='equal', cmap='RdYlBu_r')
-
+    global sc_geo_mnt
+    if sc_geo_mnt is None:
+        sc_uv_mnt_from_geo = ax1.scatter(mnt_u_from_geo, mnt_v_from_geo, c= mnt_z, cmap='RdYlBu_r', s=2,
+                                         label='mnt drone from geo', alpha=0.7)
+        sc_geo_mnt = ax2.scatter(mnt_x, mnt_y, c=mnt_z, cmap='RdYlBu_r', s=6, label='mnt drone')
+        ax1.set_xlim([2000, 2650])
+        ax1.set_ylim([1070, 1600])
+        ax1.yaxis.set_inverted(True)
+    else:
+        # Supprimer le scatter existant
+        sc_geo_mnt.remove()
+        sc_geo_mnt = None
+    ax2.legend(fontsize=16)
+    plot.update()
 
 def update_plot(new_angle, i_angle, origin):
 
@@ -132,16 +159,17 @@ def update_plot(new_angle, i_angle, origin):
     georef_params.extrinsic = updated_georef
 
     # Mettre à jour les points u_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
-    xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-        compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
-                                             np.array(df_corresp_pts_remarquables[
-                                                                      ['easting', 'northing', 'elevation']]),
-                                             georef_params))
+    if sc_uv_rkables is not None:
+        xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
+            compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
+                                                 np.array(df_corresp_pts_remarquables[
+                                                                          ['easting', 'northing', 'elevation']]),
+                                                 georef_params))
 
-    # Mettre à jour les scatter
-    sc_uv_rkables_from_geo.set_offsets(np.c_[u_remarkables_from_geo, v_remarkables_from_geo])
-    sc_geo_rkables_from_pix.set_offsets(np.c_[xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :]])
-    plot.update()
+        # Mettre à jour les scatter
+        sc_uv_rkables_from_geo.set_offsets(np.c_[u_remarkables_from_geo, v_remarkables_from_geo])
+        sc_geo_rkables_from_pix.set_offsets(np.c_[xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :]])
+        plot.update()
 
 def reset_sliders():
     for name, slider in sliders.items():
@@ -171,7 +199,8 @@ img = read_img(f_img)
 df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = read_remarkable_pts(f_corresp_pts_remarquables)
 
 # read mnt drone
-mnt, mnt_extent = read_tif_mnt(f_mnt)
+mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
+
 
 with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
     ax1 = plot.figure.add_subplot(121)
@@ -192,7 +221,8 @@ sc_uv_rkables = None
 sc_uv_rkables_from_geo = None
 sc_geo_rkables = None
 sc_geo_rkables_from_pix = None
-imshow_mnt = None
+sc_geo_mnt = None
+sc_uv_mnt_from_geo = None
 
 
 # Buttons NiceGUI
@@ -202,9 +232,14 @@ with ui.button_group():
     button_rkables = ui.button('remarkable pts', on_click=toggle_scatter_remarkables)
     button_rkables.style('width: 250px; height: 80px; font-size: 20px;')
 
-    # bouton 3d to points
-    button_topo_pts = ui.button('topo pts', )
+    # bouton mnt drone
+    button_topo_pts = ui.button('mnt drone', on_click=toggle_mnt)
     button_topo_pts.style('width: 200px; height: 80px; font-size: 20px;')
+
+    # bouton save georef
+    button_save_georef = ui.button('save georef')
+    button_save_georef.style('width: 200px; height: 80px; font-size: 20px;')
+
 
 
 # Sliders NiceGUI
