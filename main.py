@@ -57,7 +57,7 @@ def read_remarkable_pts(f_corresp_pts_remarquables):
                                              georef_params))
     return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
 
-def read_tif_mnt(f_mnt, epsg_mnt, georef_params):
+def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=5):
 
     # extent of tif file
     band1 = georaster.SingleBandRaster(f_mnt, load_data=False)
@@ -84,7 +84,7 @@ def read_tif_mnt(f_mnt, epsg_mnt, georef_params):
     # mnt uv from geo
     u, v = world_2_pix(np.vstack([x, y, data]), georef_params)
 
-    return data, x, y, u, v
+    return data[::ss_ech_factor], x[::ss_ech_factor], y[::ss_ech_factor], u[::ss_ech_factor], v[::ss_ech_factor]
 
 def pix_2_world(uvz, georef_params):
     # convert pix points to geo local
@@ -136,17 +136,21 @@ def toggle_scatter_remarkables():
 
 def toggle_mnt():
     global sc_geo_mnt
+    global sc_uv_mnt_from_geo
     if sc_geo_mnt is None:
         sc_uv_mnt_from_geo = ax1.scatter(mnt_u_from_geo, mnt_v_from_geo, c= mnt_z, cmap='RdYlBu_r', s=2,
                                          label='mnt drone from geo', alpha=0.7)
         sc_geo_mnt = ax2.scatter(mnt_x, mnt_y, c=mnt_z, cmap='RdYlBu_r', s=6, label='mnt drone')
-        ax1.set_xlim([2000, 2650])
-        ax1.set_ylim([1070, 1600])
+        ax1.set_xlim([2100, 2390])
+        ax1.set_ylim([1100, 1330])
         ax1.yaxis.set_inverted(True)
     else:
         # Supprimer le scatter existant
         sc_geo_mnt.remove()
         sc_geo_mnt = None
+        sc_uv_mnt_from_geo.remove()
+        sc_uv_mnt_from_geo = None
+
     ax2.legend(fontsize=16)
     plot.update()
 
@@ -158,7 +162,7 @@ def update_plot(new_angle, i_angle, origin):
     updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(origin, cam_angles)
     georef_params.extrinsic = updated_georef
 
-    # Mettre à jour les points u_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
+    # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
     if sc_uv_rkables is not None:
         xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
             compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
@@ -166,10 +170,16 @@ def update_plot(new_angle, i_angle, origin):
                                                                           ['easting', 'northing', 'elevation']]),
                                                  georef_params))
 
-        # Mettre à jour les scatter
+        # Mise à jour des scatter plots
         sc_uv_rkables_from_geo.set_offsets(np.c_[u_remarkables_from_geo, v_remarkables_from_geo])
         sc_geo_rkables_from_pix.set_offsets(np.c_[xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :]])
-        plot.update()
+    if sc_uv_mnt_from_geo is not None:
+        mnt_u_from_geo, mnt_v_from_geo = world_2_pix(np.vstack([mnt_x, mnt_y, mnt_z]), georef_params)
+        # Mise à jour des scatter plots
+        sc_uv_mnt_from_geo.set_offsets(np.c_[mnt_u_from_geo, mnt_v_from_geo])
+
+    plot.update()
+
 
 def reset_sliders():
     for name, slider in sliders.items():
@@ -180,7 +190,7 @@ f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_ce
 f_corresp_pts_remarquables = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
 f_camera_parameters = 'camera_parameters_cam44.json'
 f_ortho = '/home/florent/Projects/Etretat/Geodesie/orthophoto_2025.tif'
-f_mnt = '/home/florent/Projects/Etretat/Geodesie/MNT_drone/03_etretat_20210402_DEM_selection_groyne_tight.tif'
+f_mnt = '/home/florent/Projects/Etretat/Geodesie/MNT_drone/03_etretat_20210402_DEM_selection_groyne_medium.tif'
 
 
 # read ortho
