@@ -30,7 +30,7 @@ def world_2_pix(xyz, georef_params):
     u, v = georef_params.geo2pix(geo_local)
     return u ,v
 
-def compute_remarkables_xyz_from_pix_and_uv_from_geo(uvz, xyz, georef_params):
+def compute_xyz_from_pix_and_uv_from_geo(uvz, xyz, georef_params):
     xyz_from_pix = pix_2_world(uvz, georef_params)
     u, v = world_2_pix(xyz, georef_params)
     return xyz_from_pix, u, v
@@ -77,12 +77,12 @@ def update_plot(new_angle, i_angle, origin):
 
     # Mettre à jour les points u_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
     xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-        compute_remarkables_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
-                                                         np.array(df_corresp_pts_remarquables[
+        compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
+                                             np.array(df_corresp_pts_remarquables[
                                                                       ['easting', 'northing', 'elevation']]),
-                                                         georef_params))
+                                             georef_params))
 
-    # Mettre à jour le scatter
+    # Mettre à jour les scatter
     sc_uv_rkables_from_geo.set_offsets(np.c_[u_remarkables_from_geo, v_remarkables_from_geo])
     sc_geo_rkables_from_pix.set_offsets(np.c_[xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :]])
     plot.update()
@@ -96,7 +96,6 @@ f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_ce
 f_corresp_pts_remarquables = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
 f_camera_parameters = 'camera_parameters_cam44.json'
 f_ortho = '/home/florent/Projects/Etretat/Geodesie/orthophoto_2025.tif'
-plot_remarkables = True
 
 
 # read ortho
@@ -131,9 +130,9 @@ df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
 df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
 
 xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-    compute_remarkables_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
-                                                 np.array(df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
-                                                 georef_params))
+    compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
+                                         np.array(df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
+                                         georef_params))
 
 with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
     ax1 = plot.figure.add_subplot(121)
