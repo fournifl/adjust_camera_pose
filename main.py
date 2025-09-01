@@ -18,6 +18,13 @@ def read_ortho(f_ortho):
 
     return extent, data
 
+def read_img(f_img):
+    img = cv2.imread(f_img)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # undistort image
+    img = georef_params.undistort(img)
+    return img
+
 def get_camera_angles_and_orig(georef_params):
     cam_angles = georef_params.extrinsic.beachcam_angles
     cam_angles_init_tmp = copy(cam_angles)
@@ -47,7 +54,19 @@ def read_remarkable_pts(f_corresp_pts_remarquables):
                                              georef_params))
     return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
 
-# def read_tif_mnt(_f_mnt):
+def read_tif_mnt(f_mnt):
+
+    # extent of tif file
+    band1 = georaster.SingleBandRaster(f_mnt, load_data=False)
+    xmin, xmax, ymin, ymax = band1.extent
+
+    # get mnt data
+    data = tifffile.imread(f_mnt)
+
+    # create masked array
+    data = np.ma.array(data, mask=data < -32760)
+
+    return data, band1.extent
 
 
 def pix_2_world(uvz, georef_params):
@@ -98,6 +117,12 @@ def toggle_scatter_remarkables():
 
     plot.update()
 
+def toggle_mnt():
+    global imshow_mnt
+    if imshow_mnt is None:
+        imshow_mnt = ax2.imshow(data, extent=(xmin, xmax, ymin, ymax), aspect='equal', cmap='RdYlBu_r')
+
+
 def update_plot(new_angle, i_angle, origin):
 
     cam_angles[i_angle]  = new_angle
@@ -140,13 +165,13 @@ georef_params = Georef.from_param_file(f_camera_parameters)
 cam_angles, origin, cam_angles_init = get_camera_angles_and_orig(georef_params)
 
 # read raw image
-img = cv2.imread(f_img)
-img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-# undistort image
-img = georef_params.undistort(img)
+img = read_img(f_img)
 
 # read remarkable points in correspondance file
 df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = read_remarkable_pts(f_corresp_pts_remarquables)
+
+# read mnt drone
+mnt, mnt_extent = read_tif_mnt(f_mnt)
 
 with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
     ax1 = plot.figure.add_subplot(121)
@@ -167,6 +192,7 @@ sc_uv_rkables = None
 sc_uv_rkables_from_geo = None
 sc_geo_rkables = None
 sc_geo_rkables_from_pix = None
+imshow_mnt = None
 
 
 # Buttons NiceGUI
