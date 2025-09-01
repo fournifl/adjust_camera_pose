@@ -76,7 +76,7 @@ def toggle_scatter_remarkables():
         sc_uv_rkables = ax1.scatter(df_corresp_pts_remarquables['U_undist'], df_corresp_pts_remarquables['V_undist'],
                                     c='b', s=6, label='remarkables')
         sc_uv_rkables_from_geo = ax1.scatter(u_remarkables_from_geo, v_remarkables_from_geo, c='cyan', s=6,
-                                             label='remarquables from geo')
+                                             label='remarkables from geo')
         sc_geo_rkables = ax2.scatter(df_corresp_pts_remarquables['easting'], df_corresp_pts_remarquables['northing'],
                                     c='b', s=6, label='remarkables')
         sc_geo_rkables_from_pix = ax2.scatter(xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :], c='cyan',
@@ -169,7 +169,7 @@ sc_geo_rkables = None
 sc_geo_rkables_from_pix = None
 
 
-# boutons
+# Buttons NiceGUI
 with ui.button_group():
 
     # bouton points remarquables
@@ -187,7 +187,7 @@ with ui.button_group():
 ui.add_head_html('''
 <style>
 .q-slider__label {
-    font-size: 20px !important;  /* taille du texte */
+    font-size: 20px;  /* taille du texte */
     font-weight: bold;           /* facultatif, mettre en gras */
     color: darkblue;             /* changer la couleur */
 }
@@ -195,20 +195,17 @@ ui.add_head_html('''
 ''')
 
 sliders = {}
-ui.label('angle 1')
+ui.label('yaw (°)')
 sliders[0] = ui.slider(min=cam_angles_init[0] - 0.5, max=cam_angles_init[0] + 0.5, value=cam_angles[0],
                    step=0.1, on_change=lambda e1: update_plot(e1.value, 0, origin)).props('label')
-ui.label().bind_text_from(sliders[0], 'value')
 
-ui.label('angle 2')
+ui.label('pitch (°)')
 sliders[1] = ui.slider(min=cam_angles_init[1] - 1, max=cam_angles_init[1] + 1, value=cam_angles[1],
-                    step=0.1, on_change=lambda e2: update_plot(e2.value, 1, origin))
-ui.label().bind_text_from(sliders[1], 'value')
+                    step=0.1, on_change=lambda e2: update_plot(e2.value, 1, origin)).props('label')
 
-ui.label('angle 3')
+ui.label('roll (°)')
 sliders[2] = ui.slider(min=cam_angles_init[2] - 1, max=cam_angles_init[2] + 1, value=cam_angles[2],
-                    step=0.1, on_change=lambda e3: update_plot(e3.value, 2, origin))
-ui.label().bind_text_from(sliders[2], 'value')
+                    step=0.1, on_change=lambda e3: update_plot(e3.value, 2, origin)).props('label')
 ui.run()
 
 # Bouton pour tout réinitialiser au niveau des sliders
