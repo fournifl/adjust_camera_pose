@@ -3,8 +3,7 @@ import numpy as np
 import cv2
 from copy import copy
 import pandas as pd
-from georef.operators import Georef, ExtrinsicMatrix
-import matplotlib.pyplot as plt
+from georef.operators import Georef
 import georaster
 import tifffile
 
@@ -18,6 +17,38 @@ def read_ortho(f_ortho):
     data = tifffile.imread(f_ortho)
 
     return extent, data
+
+def get_camera_angles_and_orig(georef_params):
+    cam_angles = georef_params.extrinsic.beachcam_angles
+    cam_angles_init_tmp = copy(cam_angles)
+    cam_angles_init = {}
+    cam_angles_init[0] = cam_angles_init_tmp[0]
+    cam_angles_init[1] = cam_angles_init_tmp[1]
+    cam_angles_init[2] = cam_angles_init_tmp[2]
+    origin = georef_params.extrinsic.origin
+    return cam_angles, origin, cam_angles_init
+
+def read_remarkable_pts(f_corresp_pts_remarquables):
+    df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables,
+                                              usecols=['easting', 'northing', 'elevation', 'U', 'V'])
+    # create U_undist and V_undist
+    undist_pts = cv2.undistortPoints(np.array(df_corresp_pts_remarquables[['U', 'V']]).astype(float),
+                                     georef_params.intrinsic_parameters.camera_matrix,
+                                     georef_params.distortion_coefficients.array,
+                                     P=georef_params.intrinsic_parameters.camera_matrix)
+    undist_pts = undist_pts.reshape((undist_pts.shape[0], undist_pts.shape[2]))
+    df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
+    df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
+
+    xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
+        compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
+                                             np.array(
+                                                 df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
+                                             georef_params))
+    return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
+
+# def read_tif_mnt(_f_mnt):
+
 
 def pix_2_world(uvz, georef_params):
     # convert pix points to geo local
@@ -96,6 +127,7 @@ f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_ce
 f_corresp_pts_remarquables = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
 f_camera_parameters = 'camera_parameters_cam44.json'
 f_ortho = '/home/florent/Projects/Etretat/Geodesie/orthophoto_2025.tif'
+f_mnt = '/home/florent/Projects/Etretat/Geodesie/MNT_drone/03_etretat_20210402_DEM_selection_groyne_tight.tif'
 
 
 # read ortho
@@ -104,14 +136,8 @@ extent_ortho, data_ortho = read_ortho(f_ortho)
 # get georef parameters
 georef_params = Georef.from_param_file(f_camera_parameters)
 
-# read camera angles
-cam_angles = georef_params.extrinsic.beachcam_angles
-cam_angles_init_tmp = copy(cam_angles)
-cam_angles_init = {}
-cam_angles_init[0] = cam_angles_init_tmp[0]
-cam_angles_init[1] = cam_angles_init_tmp[1]
-cam_angles_init[2] = cam_angles_init_tmp[2]
-origin = georef_params.extrinsic.origin
+# get camera angles
+cam_angles, origin, cam_angles_init = get_camera_angles_and_orig(georef_params)
 
 # read raw image
 img = cv2.imread(f_img)
@@ -120,19 +146,7 @@ img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 img = georef_params.undistort(img)
 
 # read remarkable points in correspondance file
-df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables, usecols=['easting', 'northing', 'elevation', 'U', 'V'])
-# create U_undist and V_undist
-undist_pts = cv2.undistortPoints(np.array(df_corresp_pts_remarquables[['U', 'V']]).astype(float),
-                                 georef_params.intrinsic_parameters.camera_matrix, georef_params.distortion_coefficients.array,
-                                 P=georef_params.intrinsic_parameters.camera_matrix)
-undist_pts = undist_pts.reshape((undist_pts.shape[0], undist_pts.shape[2]))
-df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
-df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
-
-xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-    compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
-                                         np.array(df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
-                                         georef_params))
+df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = read_remarkable_pts(f_corresp_pts_remarquables)
 
 with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
     ax1 = plot.figure.add_subplot(121)
