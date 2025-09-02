@@ -1,5 +1,6 @@
-from matplotlib import pyplot as plt
+import json
 from nicegui import ui
+from georef.in_out import CameraParameters, read_json_file
 import numpy as np
 import cv2
 from copy import copy
@@ -185,6 +186,25 @@ def reset_sliders():
     for name, slider in sliders.items():
         slider.value = cam_angles_init[name]
 
+def write_adjusted_camera_parameters():
+
+    # load original camera parameters
+    param_dict = read_json_file(f_camera_parameters)
+    validated_parameters = CameraParameters.model_validate(param_dict)
+    validated_params_dict = CameraParameters.model_dump(validated_parameters)
+
+    # update camera parameters with updated rvec, tvec
+    validated_params_dict['extrinsic_parameters']['rvec']  = list(np.squeeze(georef_params.extrinsic.rvec.astype(float)))
+    validated_params_dict['extrinsic_parameters']['tvec'] = list(np.squeeze(georef_params.extrinsic.tvec.astype(float)))
+    camera_parameters = CameraParameters(**validated_params_dict)
+    camera_parameters_dict = CameraParameters.model_dump(camera_parameters)
+
+    # save updated camera parameters to json
+    json_str = json.dumps(camera_parameters_dict, indent=2)
+    with open("adjusted_camera_parameters.json", "w") as f:
+        f.write(json_str)
+
+
 # parameters
 f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_central2_2fps_600s_20240223_14_00.jpg'
 f_corresp_pts_remarquables = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
@@ -247,7 +267,7 @@ with ui.button_group():
     button_topo_pts.style('width: 200px; height: 80px; font-size: 20px;')
 
     # bouton save georef
-    button_save_georef = ui.button('save georef')
+    button_save_georef = ui.button('save georef', on_click=write_adjusted_camera_parameters)
     button_save_georef.style('width: 200px; height: 80px; font-size: 20px;')
 
 
