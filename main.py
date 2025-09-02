@@ -28,7 +28,7 @@ def read_img(f_img):
     img = georef_params.undistort(img)
     return img
 
-def get_camera_angles_and_orig(georef_params):
+def get_adjustable_elements(georef_params):
     # camera angles
     cam_angles = georef_params.extrinsic.beachcam_angles
     cam_angles_init_tmp = copy(cam_angles)
@@ -45,14 +45,14 @@ def get_camera_angles_and_orig(georef_params):
     origin_init[2] = origin[2]
 
     # save all in one dictionnary
-    came_angles_orig = {}
-    came_angles_orig['angles_init'] = cam_angles_init
-    came_angles_orig['angles'] = cam_angles
-    came_angles_orig['orig_init'] = origin_init
-    came_angles_orig['orig'] = origin
+    adjustable_elements = {}
+    adjustable_elements['angles_init'] = cam_angles_init
+    adjustable_elements['angles'] = cam_angles
+    adjustable_elements['orig_init'] = origin_init
+    adjustable_elements['orig'] = origin
 
     # return cam_angles, cam_angles_init, origin, origin_init
-    return came_angles_orig
+    return adjustable_elements
 
 def read_remarkable_pts(f_corresp_pts_remarquables):
     df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables,
@@ -174,11 +174,11 @@ def toggle_mnt():
 
 def update_plot(value, key, i_key):
 
-    cam_angles_origin[key][i_key] = value
+    adjustable_elements[key][i_key] = value
 
     # Calculer le nouveau georef_params
-    updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(cam_angles_origin['orig'],
-                                                                         cam_angles_origin['angles'])
+    updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(adjustable_elements['orig'],
+                                                                         adjustable_elements['angles'])
     georef_params.extrinsic = updated_georef
 
     # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
@@ -201,17 +201,17 @@ def update_plot(value, key, i_key):
 
 def add_slider(sliders, label, key, i_key, dminmax, step):
     ui.label(label)
-    sliders[f'{key}_{i_key}'] = ui.slider(min=cam_angles_origin[f'{key}_init'][i_key] - dminmax,
-                                    max=cam_angles_origin[f'{key}_init'][i_key] + dminmax,
-                                    value=cam_angles_origin[key][i_key], step=step,
-                                    on_change=lambda e: update_plot(e.value, key, i_key)).props('label')
+    sliders[f'{key}_{i_key}'] = ui.slider(min=adjustable_elements[f'{key}_init'][i_key] - dminmax,
+                                          max=adjustable_elements[f'{key}_init'][i_key] + dminmax,
+                                          value=adjustable_elements[key][i_key], step=step,
+                                          on_change=lambda e: update_plot(e.value, key, i_key)).props('label')
     return sliders
 
 def reset_sliders():
     for name, slider in sliders.items():
         key = name.split('_')[0]
         i_key = int(name.split('_')[1])
-        slider.value = cam_angles_origin[key + '_init'][i_key]
+        slider.value = adjustable_elements[key + '_init'][i_key]
 
 def write_adjusted_camera_parameters():
 
@@ -247,8 +247,7 @@ extent_ortho, data_ortho = read_ortho(f_ortho)
 georef_params = Georef.from_param_file(f_camera_parameters)
 
 # get camera angles
-# cam_angles, cam_angles_init, origin, origin_init = get_camera_angles_and_orig(georef_params)
-cam_angles_origin = get_camera_angles_and_orig(georef_params)
+adjustable_elements = get_adjustable_elements(georef_params)
 
 # read raw image
 img = read_img(f_img)
@@ -271,7 +270,7 @@ with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
     ax2.axes.get_yaxis().set_ticks([])
     ax2.set_xlim([298245, 298295])
     ax2.set_ylim([5509940, 5509990])
-    plot.update()  # <- indispensable pour afficher dès le début
+    plot.update()
 
 
 # Variables pour stocker les scatters
