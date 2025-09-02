@@ -6,7 +6,7 @@ import cv2
 from copy import copy
 import pandas as pd
 from pyproj import Transformer
-from georef.operators import Georef
+from georef.operators import Georef, IntrinsicMatrix
 import georaster
 import tifffile
 
@@ -28,53 +28,7 @@ def read_img(f_img):
     img = georef_params.undistort(img)
     return img
 
-def get_adjustable_elements(georef_params):
-    # camera angles
-    cam_angles = georef_params.extrinsic.beachcam_angles
-    cam_angles_init_tmp = copy(cam_angles)
-    cam_angles_init = {}
-    cam_angles_init[0] = cam_angles_init_tmp[0]
-    cam_angles_init[1] = cam_angles_init_tmp[1]
-    cam_angles_init[2] = cam_angles_init_tmp[2]
-
-    # camera origin
-    origin = georef_params.extrinsic.origin
-    origin_init = {}
-    origin_init[0] = origin[0]
-    origin_init[1] = origin[1]
-    origin_init[2] = origin[2]
-
-    # save all in one dictionnary
-    adjustable_elements = {}
-    adjustable_elements['angles_init'] = cam_angles_init
-    adjustable_elements['angles'] = cam_angles
-    adjustable_elements['orig_init'] = origin_init
-    adjustable_elements['orig'] = origin
-
-    # return cam_angles, cam_angles_init, origin, origin_init
-    return adjustable_elements
-
-def read_remarkable_pts(f_corresp_pts_remarquables):
-    df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables,
-                                              usecols=['easting', 'northing', 'elevation', 'U', 'V'])
-    # create U_undist and V_undist
-    undist_pts = cv2.undistortPoints(np.array(df_corresp_pts_remarquables[['U', 'V']]).astype(float),
-                                     georef_params.intrinsic_parameters.camera_matrix,
-                                     georef_params.distortion_coefficients.array,
-                                     P=georef_params.intrinsic_parameters.camera_matrix)
-    undist_pts = undist_pts.reshape((undist_pts.shape[0], undist_pts.shape[2]))
-    df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
-    df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
-
-    # remarkable pts xyz from pix, and uv from geo
-    xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-        compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
-                                             np.array(
-                                                 df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
-                                             georef_params))
-    return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
-
-def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=5):
+def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=100):
 
     # extent of tif file
     band1 = georaster.SingleBandRaster(f_mnt, load_data=False)
@@ -102,6 +56,59 @@ def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=5):
     u, v = world_2_pix(np.vstack([x, y, data]), georef_params)
 
     return data[::ss_ech_factor], x[::ss_ech_factor], y[::ss_ech_factor], u[::ss_ech_factor], v[::ss_ech_factor]
+
+def read_remarkable_pts(f_corresp_pts_remarquables):
+    df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables,
+                                              usecols=['easting', 'northing', 'elevation', 'U', 'V'])
+    # create U_undist and V_undist
+    undist_pts = cv2.undistortPoints(np.array(df_corresp_pts_remarquables[['U', 'V']]).astype(float),
+                                     georef_params.intrinsic_parameters.camera_matrix,
+                                     georef_params.distortion_coefficients.array,
+                                     P=georef_params.intrinsic_parameters.camera_matrix)
+    undist_pts = undist_pts.reshape((undist_pts.shape[0], undist_pts.shape[2]))
+    df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
+    df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
+
+    # remarkable pts xyz from pix, and uv from geo
+    xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
+        compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
+                                             np.array(
+                                                 df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
+                                             georef_params))
+    return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
+
+def get_adjustable_elements(georef_params):
+    # camera angles
+    cam_angles = georef_params.extrinsic.beachcam_angles
+    cam_angles_init_tmp = copy(cam_angles)
+    cam_angles_init = {}
+    cam_angles_init[0] = cam_angles_init_tmp[0]
+    cam_angles_init[1] = cam_angles_init_tmp[1]
+    cam_angles_init[2] = cam_angles_init_tmp[2]
+
+    # camera origin
+    origin = georef_params.extrinsic.origin
+    origin_init = {}
+    origin_init[0] = origin[0]
+    origin_init[1] = origin[1]
+    origin_init[2] = origin[2]
+
+    # fx, fy
+    focal  = [georef_params.intrinsic.fx, georef_params.intrinsic.fy]
+    focal_init = {}
+    focal_init[0] = focal[0]
+    focal_init[1] = focal[1]
+
+    # save all in one dictionnary
+    adjustable_elements = {}
+    adjustable_elements['angles'] = cam_angles
+    adjustable_elements['angles_init'] = cam_angles_init
+    adjustable_elements['orig'] = origin
+    adjustable_elements['orig_init'] = origin_init
+    adjustable_elements['focal'] = focal
+    adjustable_elements['focal_init'] = focal_init
+
+    return adjustable_elements
 
 def pix_2_world(uvz, georef_params):
     # convert pix points to geo local
@@ -174,12 +181,19 @@ def toggle_mnt():
 
 def update_plot(value, key, i_key):
 
+    # get value from slider, and apply it to the corresponding adjustable element
     adjustable_elements[key][i_key] = value
 
-    # Calculer le nouveau georef_params
-    updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(adjustable_elements['orig'],
-                                                                         adjustable_elements['angles'])
-    georef_params.extrinsic = updated_georef
+    # compute new extrinsinc parameters if necessary
+    if key in ['orig', 'angles']:
+        # Calculer le nouveau georef_params
+        updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(adjustable_elements['orig'],
+                                                                             adjustable_elements['angles'])
+        georef_params.extrinsic = updated_georef
+    # compute new intrinsinc parameters (focal lengths) if necessary
+    elif key == 'focal':
+        intrinsinc = IntrinsicMatrix(value, value, georef_params.intrinsic.cx, georef_params.intrinsic.cy)
+        georef_params.intrinsic = intrinsinc
 
     # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
     if sc_uv_rkables is not None:
@@ -298,9 +312,7 @@ with ui.button_group().classes('mx-auto'):
     button_save_georef.style('width: 200px; height: 20px; font-size: 15px;')
 
 
-
 # Sliders NiceGUI
-
 # Ajouter du CSS personnalisé qui s'applique à tous les labels de sliders
 ui.add_head_html('''
 <style>
@@ -317,14 +329,16 @@ ui.add_head_html('''
 # }
 # </style>
 ''')
-
 sliders = {}
-sliders = add_slider(sliders, label='yaw (°)', key='angles', i_key=0, dminmax=0.5, step=0.05)
-sliders = add_slider(sliders, label='pitch (°)', key='angles', i_key=1, dminmax=0.5, step=0.05)
-sliders = add_slider(sliders, label='roll (°)', key='angles', i_key=2, dminmax=0.5, step=0.05)
+sliders = add_slider(sliders, label='yaw (°)', key='angles', i_key=0, dminmax=0.5, step=0.01)
+sliders = add_slider(sliders, label='pitch (°)', key='angles', i_key=1, dminmax=0.5, step=0.01)
+sliders = add_slider(sliders, label='roll (°)', key='angles', i_key=2, dminmax=0.5, step=0.01)
 sliders = add_slider(sliders, label="camera's origin x (local coordinates)", key='orig', i_key=0, dminmax=2, step=0.1)
 sliders = add_slider(sliders, label="camera's origin y (local coordinates)", key='orig', i_key=1, dminmax=2, step=0.1)
 sliders = add_slider(sliders, label="camera's origin z (local coordinates)", key='orig', i_key=2, dminmax=2, step=0.1)
+sliders = add_slider(sliders, label="focal (pixels)", key='focal', i_key=0, dminmax=200, step=5)
+# sliders = add_slider(sliders, label="fy (pixels)", key='focal', i_key=0, dminmax=200, step=10)
+
 
 ui.run()
 
