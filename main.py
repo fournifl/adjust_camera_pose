@@ -29,14 +29,30 @@ def read_img(f_img):
     return img
 
 def get_camera_angles_and_orig(georef_params):
+    # camera angles
     cam_angles = georef_params.extrinsic.beachcam_angles
     cam_angles_init_tmp = copy(cam_angles)
     cam_angles_init = {}
     cam_angles_init[0] = cam_angles_init_tmp[0]
     cam_angles_init[1] = cam_angles_init_tmp[1]
     cam_angles_init[2] = cam_angles_init_tmp[2]
+
+    # camera origin
     origin = georef_params.extrinsic.origin
-    return cam_angles, origin, cam_angles_init
+    origin_init = {}
+    origin_init[0] = origin[0]
+    origin_init[1] = origin[1]
+    origin_init[2] = origin[2]
+
+    # save all in one dictionnary
+    came_angles_orig = {}
+    came_angles_orig['angles_init'] = cam_angles_init
+    came_angles_orig['angles'] = cam_angles
+    came_angles_orig['orig_init'] = origin_init
+    came_angles_orig['orig'] = origin
+
+    # return cam_angles, cam_angles_init, origin, origin_init
+    return came_angles_orig
 
 def read_remarkable_pts(f_corresp_pts_remarquables):
     df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables,
@@ -128,7 +144,8 @@ def toggle_scatter_remarkables():
         sc_geo_rkables = None
         sc_geo_rkables_from_pix.remove()
         sc_geo_rkables_from_pix = None
-        cam_angles = cam_angles_init
+        reset_sliders()
+        # cam_angles = cam_angles_init
 
     ax1.legend(fontsize=16)
     ax2.legend(fontsize=16)
@@ -155,12 +172,13 @@ def toggle_mnt():
     ax2.legend(fontsize=16)
     plot.update()
 
-def update_plot(new_angle, i_angle, origin):
+def update_plot(value, key, i_key):
 
-    cam_angles[i_angle]  = new_angle
+    cam_angles_origin[key][i_key] = value
 
     # Calculer le nouveau georef_params
-    updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(origin, cam_angles)
+    updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(cam_angles_origin['orig'],
+                                                                         cam_angles_origin['angles'])
     georef_params.extrinsic = updated_georef
 
     # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
@@ -181,10 +199,19 @@ def update_plot(new_angle, i_angle, origin):
 
     plot.update()
 
+def add_slider(sliders, label, key, i_key, dminmax, step):
+    ui.label(label)
+    sliders[f'{key}_{i_key}'] = ui.slider(min=cam_angles_origin[f'{key}_init'][i_key] - dminmax,
+                                    max=cam_angles_origin[f'{key}_init'][i_key] + dminmax,
+                                    value=cam_angles_origin[key][i_key], step=step,
+                                    on_change=lambda e: update_plot(e.value, key, i_key)).props('label')
+    return sliders
 
 def reset_sliders():
     for name, slider in sliders.items():
-        slider.value = cam_angles_init[name]
+        key = name.split('_')[0]
+        i_key = int(name.split('_')[1])
+        slider.value = cam_angles_origin[key + '_init'][i_key]
 
 def write_adjusted_camera_parameters():
 
@@ -220,7 +247,8 @@ extent_ortho, data_ortho = read_ortho(f_ortho)
 georef_params = Georef.from_param_file(f_camera_parameters)
 
 # get camera angles
-cam_angles, origin, cam_angles_init = get_camera_angles_and_orig(georef_params)
+# cam_angles, cam_angles_init, origin, origin_init = get_camera_angles_and_orig(georef_params)
+cam_angles_origin = get_camera_angles_and_orig(georef_params)
 
 # read raw image
 img = read_img(f_img)
@@ -231,7 +259,7 @@ df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v
 # read mnt drone
 mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
 
-
+# plot raw and ortho images
 with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
     ax1 = plot.figure.add_subplot(121)
     ax1.imshow(img)
@@ -256,19 +284,19 @@ sc_uv_mnt_from_geo = None
 
 
 # Buttons NiceGUI
-with ui.button_group():
+with ui.button_group().classes('mx-auto'):
 
     # bouton points remarquables
     button_rkables = ui.button('remarkable pts', on_click=toggle_scatter_remarkables)
-    button_rkables.style('width: 250px; height: 80px; font-size: 20px;')
+    button_rkables.style('width: 200px; height: 20px; font-size: 15px;')
 
     # bouton mnt drone
     button_topo_pts = ui.button('mnt drone', on_click=toggle_mnt)
-    button_topo_pts.style('width: 200px; height: 80px; font-size: 20px;')
+    button_topo_pts.style('width: 200px; height: 20px; font-size: 15px;')
 
     # bouton save georef
     button_save_georef = ui.button('save georef', on_click=write_adjusted_camera_parameters)
-    button_save_georef.style('width: 200px; height: 80px; font-size: 20px;')
+    button_save_georef.style('width: 200px; height: 20px; font-size: 15px;')
 
 
 
@@ -277,26 +305,28 @@ with ui.button_group():
 # Ajouter du CSS personnalisé qui s'applique à tous les labels de sliders
 ui.add_head_html('''
 <style>
-.q-slider__label {
-    font-size: 20px;  /* taille du texte */
-    font-weight: bold;           /* facultatif, mettre en gras */
-    color: darkblue;             /* changer la couleur */
-}
-</style>
+        :root {
+            --nicegui-default-padding: 0.5rem;
+            --nicegui-default-gap: 0.2rem;
+        }
+    </style>
+# <style>
+# .q-slider__label {
+#     font-size: 20px;  /* taille du texte */
+#     font-weight: bold;           /* facultatif, mettre en gras */
+#     color: darkblue;             /* changer la couleur */
+# }
+# </style>
 ''')
 
 sliders = {}
-ui.label('yaw (°)')
-sliders[0] = ui.slider(min=cam_angles_init[0] - 0.5, max=cam_angles_init[0] + 0.5, value=cam_angles[0],
-                   step=0.1, on_change=lambda e1: update_plot(e1.value, 0, origin)).props('label')
+sliders = add_slider(sliders, label='yaw (°)', key='angles', i_key=0, dminmax=0.5, step=0.05)
+sliders = add_slider(sliders, label='pitch (°)', key='angles', i_key=1, dminmax=0.5, step=0.05)
+sliders = add_slider(sliders, label='roll (°)', key='angles', i_key=2, dminmax=0.5, step=0.05)
+sliders = add_slider(sliders, label="camera's origin x (local coordinates)", key='orig', i_key=0, dminmax=2, step=0.1)
+sliders = add_slider(sliders, label="camera's origin y (local coordinates)", key='orig', i_key=1, dminmax=2, step=0.1)
+sliders = add_slider(sliders, label="camera's origin z (local coordinates)", key='orig', i_key=2, dminmax=2, step=0.1)
 
-ui.label('pitch (°)')
-sliders[1] = ui.slider(min=cam_angles_init[1] - 1, max=cam_angles_init[1] + 1, value=cam_angles[1],
-                    step=0.1, on_change=lambda e2: update_plot(e2.value, 1, origin)).props('label')
-
-ui.label('roll (°)')
-sliders[2] = ui.slider(min=cam_angles_init[2] - 1, max=cam_angles_init[2] + 1, value=cam_angles[2],
-                    step=0.1, on_change=lambda e3: update_plot(e3.value, 2, origin)).props('label')
 ui.run()
 
 # Bouton pour tout réinitialiser au niveau des sliders
