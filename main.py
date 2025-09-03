@@ -156,7 +156,6 @@ def toggle_scatter_remarkables():
         sc_geo_rkables_from_pix.remove()
         sc_geo_rkables_from_pix = None
         reset_sliders()
-        # cam_angles = cam_angles_init
 
     ax1.legend(fontsize=16)
     ax2.legend(fontsize=16)
@@ -353,7 +352,5 @@ sliders = add_slider(sliders, label="camera's origin x (local coordinates)", key
 sliders = add_slider(sliders, label="camera's origin y (local coordinates)", key='orig', i_key=1, dminmax=2, step=0.1)
 sliders = add_slider(sliders, label="camera's origin z (local coordinates)", key='orig', i_key=2, dminmax=2, step=0.1)
 sliders = add_slider(sliders, label="focal (pixels)", key='focal', i_key=0, dminmax=200, step=5)
-# sliders = add_slider(sliders, label="fy (pixels)", key='focal', i_key=0, dminmax=200, step=10)
-
 
 ui.run()
