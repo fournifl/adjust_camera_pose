@@ -294,7 +294,7 @@ def optimized_update_plot():
 
 
 # plot raw and ortho images
-with ui.matplotlib(figsize=(12, 6), tight_layout=True) as plot:
+with ui.matplotlib(figsize=(20, 12), tight_layout=True) as plot:
     ax1 = plot.figure.add_subplot(121)
     ax1.imshow(img)
     ax1.axes.get_xaxis().set_ticks([])
@@ -357,6 +357,3 @@ sliders = add_slider(sliders, label="focal (pixels)", key='focal', i_key=0, dmin
 
 
 ui.run()
-
-# Bouton pour tout réinitialiser au niveau des sliders
-ui.button('Reset sliders', on_click=reset_sliders)
