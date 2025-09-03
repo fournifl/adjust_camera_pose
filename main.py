@@ -5,10 +5,14 @@ import numpy as np
 import cv2
 from copy import copy
 import pandas as pd
+from nicegui.element import Element
 from pyproj import Transformer
 from georef.operators import Georef, IntrinsicMatrix
 import georaster
 import tifffile
+import io
+import base64
+
 
 def read_ortho(f_ortho):
 
@@ -28,7 +32,7 @@ def read_img(f_img):
     img = georef_params.undistort(img)
     return img
 
-def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=100):
+def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=2):
 
     # extent of tif file
     band1 = georaster.SingleBandRaster(f_mnt, load_data=False)
@@ -157,7 +161,7 @@ def toggle_scatter_remarkables():
     ax1.legend(fontsize=16)
     ax2.legend(fontsize=16)
 
-    plot.update()
+    optimized_update_plot()
 
 def toggle_mnt():
     global sc_geo_mnt
@@ -177,9 +181,12 @@ def toggle_mnt():
         sc_uv_mnt_from_geo = None
 
     ax2.legend(fontsize=16)
-    plot.update()
+    optimized_update_plot()
 
 def update_plot(value, key, i_key):
+    global flag_refresh
+    if not flag_refresh:
+        return
 
     # get value from slider, and apply it to the corresponding adjustable element
     adjustable_elements[key][i_key] = value
@@ -211,7 +218,7 @@ def update_plot(value, key, i_key):
         # Mise à jour des scatter plots
         sc_uv_mnt_from_geo.set_offsets(np.c_[mnt_u_from_geo, mnt_v_from_geo])
 
-    plot.update()
+    optimized_update_plot()
 
 def add_slider(sliders, label, key, i_key, dminmax, step):
     ui.label(label)
@@ -222,10 +229,13 @@ def add_slider(sliders, label, key, i_key, dminmax, step):
     return sliders
 
 def reset_sliders():
+    global flag_refresh
+    flag_refresh = False
     for name, slider in sliders.items():
         key = name.split('_')[0]
         i_key = int(name.split('_')[1])
         slider.value = adjustable_elements[key + '_init'][i_key]
+    flag_refresh = True
 
 def write_adjusted_camera_parameters():
 
@@ -272,8 +282,19 @@ df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v
 # read mnt drone
 mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
 
+
+def optimized_update_plot():
+    global plot
+    with io.BytesIO() as output:
+        plot.figure.savefig(output, format='jpg')
+        output.seek(0)
+        img_base64 = base64.b64encode(output.read()).decode()
+        plot._props['innerHTML'] = f'<img src="data:image/jpeg;base64,{img_base64}" />'
+    Element.update(plot)
+
+
 # plot raw and ortho images
-with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
+with ui.matplotlib(figsize=(12, 6), tight_layout=True) as plot:
     ax1 = plot.figure.add_subplot(121)
     ax1.imshow(img)
     ax1.axes.get_xaxis().set_ticks([])
@@ -284,7 +305,9 @@ with ui.matplotlib(figsize=(28, 12), tight_layout=True) as plot:
     ax2.axes.get_yaxis().set_ticks([])
     ax2.set_xlim([298245, 298295])
     ax2.set_ylim([5509940, 5509990])
-    plot.update()
+    optimized_update_plot()
+
+
 
 
 # Variables pour stocker les scatters
@@ -294,7 +317,7 @@ sc_geo_rkables = None
 sc_geo_rkables_from_pix = None
 sc_geo_mnt = None
 sc_uv_mnt_from_geo = None
-
+flag_refresh = True
 
 # Buttons NiceGUI
 with ui.button_group().classes('mx-auto'):
@@ -321,13 +344,6 @@ ui.add_head_html('''
             --nicegui-default-gap: 0.2rem;
         }
     </style>
-# <style>
-# .q-slider__label {
-#     font-size: 20px;  /* taille du texte */
-#     font-weight: bold;           /* facultatif, mettre en gras */
-#     color: darkblue;             /* changer la couleur */
-# }
-# </style>
 ''')
 sliders = {}
 sliders = add_slider(sliders, label='yaw (°)', key='angles', i_key=0, dminmax=0.5, step=0.01)
