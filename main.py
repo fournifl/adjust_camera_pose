@@ -7,7 +7,7 @@ from nicegui.element import Element
 from georef.operators import Georef, IntrinsicMatrix
 import io
 import base64
-from read_inputs import read_ortho, read_img, read_remarkable_pts, read_tif_mnt
+from read_inputs import read_ortho, read_img, read_gcps, read_tif_mnt
 from geo import world_2_pix, compute_xyz_from_pix_and_uv_from_geo
 
 
@@ -41,31 +41,31 @@ def get_initial_camera_params(georef_params):
 
     return initial_camera_params
 
-def toggle_scatter_remarkables():
-    global sc_uv_rkables
-    global sc_uv_rkables_from_geo
-    global sc_geo_rkables
-    global sc_geo_rkables_from_pix
-    if sc_uv_rkables is None:
+def toggle_scatter_gcps():
+    global sc_uv_gcps
+    global sc_uv_gcps_from_geo
+    global sc_geo_gcps
+    global sc_geo_gcps_from_pix
+    if sc_uv_gcps is None:
         # Ajouter les scatters
-        sc_uv_rkables = ax1.scatter(df_corresp_pts_remarquables['U_undist'], df_corresp_pts_remarquables['V_undist'],
-                                    c='b', s=6, label='remarkables')
-        sc_uv_rkables_from_geo = ax1.scatter(u_remarkables_from_geo, v_remarkables_from_geo, c='cyan', s=6,
-                                             label='remarkables from geo')
-        sc_geo_rkables = ax2.scatter(df_corresp_pts_remarquables['easting'], df_corresp_pts_remarquables['northing'],
-                                    c='b', s=6, label='remarkables')
-        sc_geo_rkables_from_pix = ax2.scatter(xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :], c='cyan',
-                                              s=6, label='remarkables from pix')
+        sc_uv_gcps = ax1.scatter(df_gcps['U_undist'], df_gcps['V_undist'],
+                                 c='b', s=6, label='gcps')
+        sc_uv_gcps_from_geo = ax1.scatter(u_gcps_from_geo, v_gcps_from_geo, c='cyan', s=6,
+                                          label='gcps from geo')
+        sc_geo_gcps = ax2.scatter(df_gcps['easting'], df_gcps['northing'],
+                                  c='b', s=6, label='gcps')
+        sc_geo_gcps_from_pix = ax2.scatter(xyz_gcps_from_pix[0, :], xyz_gcps_from_pix[1, :], c='cyan',
+                                           s=6, label='gcps from pix')
     else:
         # Supprimer le scatter existant
-        sc_uv_rkables.remove()
-        sc_uv_rkables = None
-        sc_uv_rkables_from_geo.remove()
-        sc_uv_rkables_from_geo = None
-        sc_geo_rkables.remove()
-        sc_geo_rkables = None
-        sc_geo_rkables_from_pix.remove()
-        sc_geo_rkables_from_pix = None
+        sc_uv_gcps.remove()
+        sc_uv_gcps = None
+        sc_uv_gcps_from_geo.remove()
+        sc_uv_gcps_from_geo = None
+        sc_geo_gcps.remove()
+        sc_geo_gcps = None
+        sc_geo_gcps_from_pix.remove()
+        sc_geo_gcps_from_pix = None
         reset_sliders()
     set_sc_axis_limits(ax1, 0, width, 0, height, reverse_yaxis=True, margin=300)
     set_sc_axis_limits(ax2, extent_ortho[0], extent_ortho[1], extent_ortho[2], extent_ortho[3], margin=5)
@@ -113,16 +113,16 @@ def update_plot():
                                  georef_params.intrinsic.cy)
     georef_params.intrinsic = intrinsinc
 
-    # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix
-    if sc_uv_rkables is not None:
-        xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-            compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
-                                                 np.array(df_corresp_pts_remarquables[
+    # Calcul de uv_gcps_from_geo et xyz_gcps_from_pix
+    if sc_uv_gcps is not None:
+        xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo = (
+            compute_xyz_from_pix_and_uv_from_geo(df_gcps[['U', 'V', 'elevation']],
+                                                 np.array(df_gcps[
                                                               ['easting', 'northing', 'elevation']]),
                                                  georef_params))
         # Mise à jour des scatter plots
-        sc_uv_rkables_from_geo.set_offsets(np.c_[u_remarkables_from_geo, v_remarkables_from_geo])
-        sc_geo_rkables_from_pix.set_offsets(np.c_[xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :]])
+        sc_uv_gcps_from_geo.set_offsets(np.c_[u_gcps_from_geo, v_gcps_from_geo])
+        sc_geo_gcps_from_pix.set_offsets(np.c_[xyz_gcps_from_pix[0, :], xyz_gcps_from_pix[1, :]])
 
     # Calcul des mnts points pix
     if sc_uv_mnt_from_geo is not None:
@@ -211,7 +211,7 @@ def set_sc_axis_limits(ax, xmin_orig, xmax_orig, ymin_orig, ymax_orig, reverse_y
 
 # parameters
 f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_central2_2fps_600s_20240223_14_00.jpg'
-f_corresp_pts_remarquables = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
+f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
 f_camera_parameters = 'camera_parameters_cam44.json'
 f_ortho = '/home/florent/Projects/Etretat/Geodesie/orthophoto_2025.tif'
 f_mnt = '/home/florent/Projects/Etretat/Geodesie/MNT_drone/03_etretat_20210402_DEM_selection_groyne_medium.tif'
@@ -231,9 +231,8 @@ initial_camera_params = get_initial_camera_params(georef_params)
 img = read_img(f_img, georef_params_init)
 height, width, _ = img.shape
 
-# read remarkable points in correspondance file
-df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-    read_remarkable_pts(f_corresp_pts_remarquables, georef_params_init))
+# read gcps points
+df_gcps, xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo = read_gcps(f_gcps, georef_params_init)
 
 # read mnt drone
 mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
@@ -253,10 +252,10 @@ with ui.matplotlib(figsize=(20, 12), tight_layout=True) as plot:
     optimized_update_plot()
 
 # Variables pour stocker les scatters
-sc_uv_rkables = None
-sc_uv_rkables_from_geo = None
-sc_geo_rkables = None
-sc_geo_rkables_from_pix = None
+sc_uv_gcps = None
+sc_uv_gcps_from_geo = None
+sc_geo_gcps = None
+sc_geo_gcps_from_pix = None
 sc_geo_mnt = None
 sc_uv_mnt_from_geo = None
 flag_refresh = True
@@ -264,9 +263,9 @@ flag_refresh = True
 # Buttons NiceGUI
 with ui.button_group().classes('mx-auto'):
 
-    # bouton points remarquables
-    button_rkables = ui.button('remarkable pts', on_click=toggle_scatter_remarkables)
-    button_rkables.style('width: 200px; height: 20px; font-size: 15px;')
+    # bouton points gcps
+    button_gcps = ui.button('gcps pts', on_click=toggle_scatter_gcps)
+    button_gcps.style('width: 200px; height: 20px; font-size: 15px;')
 
     # bouton mnt drone
     button_topo_pts = ui.button('mnt drone', on_click=toggle_mnt)

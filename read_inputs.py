@@ -53,22 +53,22 @@ def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=2):
 
     return data[::ss_ech_factor], x[::ss_ech_factor], y[::ss_ech_factor], u[::ss_ech_factor], v[::ss_ech_factor]
 
-def read_remarkable_pts(f_corresp_pts_remarquables, georef_params):
-    df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables,
+def read_gcps(f_gcps, georef_params):
+    df_gcps = pd.read_csv(f_gcps,
                                               usecols=['easting', 'northing', 'elevation', 'U', 'V'])
     # create U_undist and V_undist
-    undist_pts = cv2.undistortPoints(np.array(df_corresp_pts_remarquables[['U', 'V']]).astype(float),
+    undist_pts = cv2.undistortPoints(np.array(df_gcps[['U', 'V']]).astype(float),
                                      georef_params.intrinsic_parameters.camera_matrix,
                                      georef_params.distortion_coefficients.array,
                                      P=georef_params.intrinsic_parameters.camera_matrix)
     undist_pts = undist_pts.reshape((undist_pts.shape[0], undist_pts.shape[2]))
-    df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
-    df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
+    df_gcps['U_undist'] = undist_pts[:, 0]
+    df_gcps['V_undist'] = undist_pts[:, 1]
 
     # remarkable pts xyz from pix, and uv from geo
-    xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-        compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
+    xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo = (
+        compute_xyz_from_pix_and_uv_from_geo(df_gcps[['U', 'V', 'elevation']],
                                              np.array(
-                                                 df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
+                                                 df_gcps[['easting', 'northing', 'elevation']]),
                                              georef_params))
-    return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
+    return df_gcps, xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo
