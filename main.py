@@ -11,7 +11,7 @@ from read_inputs import read_ortho, read_img, read_remarkable_pts, read_tif_mnt
 from geo import world_2_pix, compute_xyz_from_pix_and_uv_from_geo
 
 
-def get_adjustable_elements(georef_params):
+def get_initial_camera_params(georef_params):
     # camera angles
     cam_angles = georef_params.extrinsic.beachcam_angles
     cam_angles_init_tmp = copy(cam_angles)
@@ -34,15 +34,12 @@ def get_adjustable_elements(georef_params):
     focal_init[1] = focal[1]
 
     # save all in one dictionnary
-    adjustable_elements = {}
-    adjustable_elements['angles'] = cam_angles
-    adjustable_elements['angles_init'] = cam_angles_init
-    adjustable_elements['orig'] = origin
-    adjustable_elements['orig_init'] = origin_init
-    adjustable_elements['focal'] = focal
-    adjustable_elements['focal_init'] = focal_init
+    initial_camera_params = {}
+    initial_camera_params['angles'] = cam_angles_init
+    initial_camera_params['orig'] = origin_init
+    initial_camera_params['focal'] = focal_init
 
-    return adjustable_elements
+    return initial_camera_params
 
 def toggle_scatter_remarkables():
     global sc_uv_rkables
@@ -135,12 +132,11 @@ def update_plot():
 
     optimized_update_plot()
 
-
 def add_slider(sliders, label, key, i_key, dminmax, step):
     ui.label(label)
-    sliders[f'{key}_{i_key}'] = ui.slider(min=adjustable_elements[f'{key}_init'][i_key] - dminmax,
-                                          max=adjustable_elements[f'{key}_init'][i_key] + dminmax,
-                                          value=adjustable_elements[key][i_key], step=step,
+    sliders[f'{key}_{i_key}'] = ui.slider(min=initial_camera_params[f'{key}'][i_key] - dminmax,
+                                          max=initial_camera_params[f'{key}'][i_key] + dminmax,
+                                          value=initial_camera_params[f'{key}'][i_key], step=step,
                                           on_change=lambda e: update_plot())
     return sliders
 
@@ -151,7 +147,7 @@ def reset_sliders():
     for name, slider in sliders.items():
         key = name.split('_')[0]
         i_key = int(name.split('_')[1])
-        slider.value = adjustable_elements[key + '_init'][i_key]
+        slider.value = initial_camera_params[key][i_key]
     flag_refresh = True
     georef_params = georef_params_init
 
@@ -229,7 +225,7 @@ georef_params = Georef.from_param_file(f_camera_parameters)
 georef_params_init = copy(georef_params)
 
 # get camera angles
-adjustable_elements = get_adjustable_elements(georef_params)
+initial_camera_params = get_initial_camera_params(georef_params)
 
 # read raw image
 img = read_img(f_img, georef_params_init)
