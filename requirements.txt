@@ -1,0 +1,11 @@
+nicegui
+numpy
+matplotlib
+opencv-python-headless
+pandas
+georaster
+tifffile
+basemap
+imagecodecs
+adjustText
+georef @ git+ssh://git@github.com/wavesnsee/georef@main
