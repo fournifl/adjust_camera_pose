@@ -64,6 +64,8 @@ def toggle_scatter_gcps():
         sc_geo_gcps_from_pix = ax2.scatter(xyz_gcps_from_pix[0, :], xyz_gcps_from_pix[1, :], c='cyan',
                                            s=6, label='gcps from pix')
 
+        set_sc_axis_limits(ax1, 0, width, 0, height, reverse_yaxis=True, margin=300)
+        set_sc_axis_limits(ax2, extent_ortho[0], extent_ortho[1], extent_ortho[2], extent_ortho[3], margin=20)
         # reprojection error
         reproj_error = reprojection_error(xyz_gcps_from_pix[0:2, :].T, np.array(df_gcps[['easting', 'northing']]))
         labels = ["{:.2f}".format(reproj_error[i]) for i in range(len(reproj_error))]
@@ -74,7 +76,7 @@ def toggle_scatter_gcps():
                                          'Reprojection errors (mean, std):\n{:.2f}, {:.2f}'.format(
                                              reproj_error.mean(), reproj_error.std()),
                                          horizontalalignment='center', verticalalignment='center',
-                                         transform=ax2.transAxes, fontsize=16)
+                                         transform=ax2.transAxes, fontsize=16, clip_on=True)
 
     else:
         # Supprimer le scatter existant
@@ -91,8 +93,8 @@ def toggle_scatter_gcps():
         txt_err_reproj_stats.remove()
         txt_err_reproj_stats = None
         reset_sliders()
-    set_sc_axis_limits(ax1, 0, width, 0, height, reverse_yaxis=True, margin=300)
-    set_sc_axis_limits(ax2, extent_ortho[0], extent_ortho[1], extent_ortho[2], extent_ortho[3], margin=5)
+        set_sc_axis_limits(ax1, 0, width, 0, height, reverse_yaxis=True, margin=300)
+        set_sc_axis_limits(ax2, extent_ortho[0], extent_ortho[1], extent_ortho[2], extent_ortho[3], margin=20)
     ax1.legend(fontsize=16)
     ax2.legend(fontsize=16)
 
@@ -251,8 +253,10 @@ def set_sc_axis_limits(ax, xmin_orig, xmax_orig, ymin_orig, ymax_orig, reverse_y
 
 # parameters
 f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_central2_2fps_600s_20240223_14_00.jpg'
-f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
+# f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
+f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS_2024/gcps_CAM44.csv'
 f_camera_parameters = 'camera_parameters_cam44.json'
+# f_camera_parameters = 'camera_parameters_cam44_orig.json'
 f_ortho = '/home/florent/Projects/Etretat/Geodesie/orthophoto_2025.tif'
 f_mnt = '/home/florent/Projects/Etretat/Geodesie/MNT_drone/03_etretat_20210402_DEM_selection_groyne_medium.tif'
 
@@ -338,11 +342,11 @@ ui.add_head_html('''
 ''')
 sliders = {}
 sliders = add_slider(sliders, label='yaw (°)', key='angles', i_key=0, dminmax=0.5, step=0.01)
-sliders = add_slider(sliders, label='pitch (°)', key='angles', i_key=1, dminmax=0.5, step=0.01)
+sliders = add_slider(sliders, label='pitch (°)', key='angles', i_key=1, dminmax=1.5, step=0.01)
 sliders = add_slider(sliders, label='roll (°)', key='angles', i_key=2, dminmax=0.5, step=0.01)
 sliders = add_slider(sliders, label="camera's origin x (local coordinates)", key='orig', i_key=0, dminmax=2, step=0.1)
-sliders = add_slider(sliders, label="camera's origin y (local coordinates)", key='orig', i_key=1, dminmax=2, step=0.1)
-sliders = add_slider(sliders, label="camera's origin z (local coordinates)", key='orig', i_key=2, dminmax=2, step=0.1)
+sliders = add_slider(sliders, label="camera's origin y (local coordinates)", key='orig', i_key=1, dminmax=2.5, step=0.1)
+sliders = add_slider(sliders, label="camera's origin z (local coordinates)", key='orig', i_key=2, dminmax=2.5, step=0.1)
 sliders = add_slider(sliders, label="focal (pixels)", key='focal', i_key=0, dminmax=200, step=5)
 
 ui.run()
