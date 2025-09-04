@@ -1,3 +1,5 @@
+import numpy as np
+
 def pix_2_world(uvz, georef_params):
     # convert pix points to geo local
     geo_local = georef_params.pix2geo(uvz)
@@ -13,3 +15,7 @@ def compute_xyz_from_pix_and_uv_from_geo(uvz, xyz, georef_params):
     xyz_from_pix = pix_2_world(uvz, georef_params)
     u, v = world_2_pix(xyz, georef_params)
     return xyz_from_pix, u, v
+
+def reprojection_error(xy1, xy2):
+    distances = np.linalg.norm(xy1 - xy2, axis=1)
+    return distances

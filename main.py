@@ -8,7 +8,8 @@ from georef.operators import Georef, IntrinsicMatrix
 import io
 import base64
 from read_inputs import read_ortho, read_img, read_gcps, read_tif_mnt
-from geo import world_2_pix, compute_xyz_from_pix_and_uv_from_geo
+from geo import world_2_pix, compute_xyz_from_pix_and_uv_from_geo, reprojection_error
+from adjustText import adjust_text
 
 
 def get_initial_camera_params(georef_params):
@@ -46,16 +47,35 @@ def toggle_scatter_gcps():
     global sc_uv_gcps_from_geo
     global sc_geo_gcps
     global sc_geo_gcps_from_pix
+    global txt_err_reproj
+    global txt_err_reproj_stats
+
     if sc_uv_gcps is None:
         # Ajouter les scatters
+
+        # u, v
         sc_uv_gcps = ax1.scatter(df_gcps['U_undist'], df_gcps['V_undist'],
                                  c='b', s=6, label='gcps')
         sc_uv_gcps_from_geo = ax1.scatter(u_gcps_from_geo, v_gcps_from_geo, c='cyan', s=6,
                                           label='gcps from geo')
+        # geo
         sc_geo_gcps = ax2.scatter(df_gcps['easting'], df_gcps['northing'],
                                   c='b', s=6, label='gcps')
         sc_geo_gcps_from_pix = ax2.scatter(xyz_gcps_from_pix[0, :], xyz_gcps_from_pix[1, :], c='cyan',
                                            s=6, label='gcps from pix')
+
+        # reprojection error
+        reproj_error = reprojection_error(xyz_gcps_from_pix[0:2, :].T, np.array(df_gcps[['easting', 'northing']]))
+        labels = ["{:.2f}".format(reproj_error[i]) for i in range(len(reproj_error))]
+        txt_err_reproj = [ax2.text(xi, yi, label)
+                          for xi, yi, label in zip(x_gcps_from_pix, y_gcps_from_pix, labels)]
+        adjust_text(txt_err_reproj, ax=ax2)
+        txt_err_reproj_stats =  ax2.text(0.2, 0.9,
+                                         'Reprojection errors (mean, std):\n{:.2f}, {:.2f}'.format(
+                                             reproj_error.mean(), reproj_error.std()),
+                                         horizontalalignment='center', verticalalignment='center',
+                                         transform=ax2.transAxes, fontsize=16)
+
     else:
         # Supprimer le scatter existant
         sc_uv_gcps.remove()
@@ -66,6 +86,10 @@ def toggle_scatter_gcps():
         sc_geo_gcps = None
         sc_geo_gcps_from_pix.remove()
         sc_geo_gcps_from_pix = None
+        [txt_err_reproj[i].remove() for i in range(len(txt_err_reproj))]
+        txt_err_reproj = None
+        txt_err_reproj_stats.remove()
+        txt_err_reproj_stats = None
         reset_sliders()
     set_sc_axis_limits(ax1, 0, width, 0, height, reverse_yaxis=True, margin=300)
     set_sc_axis_limits(ax2, extent_ortho[0], extent_ortho[1], extent_ortho[2], extent_ortho[3], margin=5)
@@ -97,6 +121,8 @@ def toggle_mnt():
 
 def update_plot():
     global flag_refresh
+    global txt_err_reproj
+    global txt_err_reproj_stats
     if not flag_refresh:
         return
 
@@ -120,9 +146,23 @@ def update_plot():
                                                  np.array(df_gcps[
                                                               ['easting', 'northing', 'elevation']]),
                                                  georef_params))
+        # calcul erreur de reprojection
+        reproj_error = reprojection_error(xyz_gcps_from_pix[0:2, :].T, np.array(df_gcps[['easting', 'northing']]))
+
         # Mise à jour des scatter plots
         sc_uv_gcps_from_geo.set_offsets(np.c_[u_gcps_from_geo, v_gcps_from_geo])
         sc_geo_gcps_from_pix.set_offsets(np.c_[xyz_gcps_from_pix[0, :], xyz_gcps_from_pix[1, :]])
+        [txt_err_reproj[i].remove() for i in range(len(txt_err_reproj))]
+        txt_err_reproj_stats.remove()
+        labels = ["{:.2f}".format(reproj_error[i]) for i in range(len(reproj_error))]
+        txt_err_reproj = [ax2.text(xi, yi, label)
+                          for xi, yi, label in zip(x_gcps_from_pix, y_gcps_from_pix, labels)]
+        adjust_text(txt_err_reproj, ax=ax2)
+        txt_err_reproj_stats = ax2.text(0.2, 0.9,
+                                        'Reprojection errors (mean, std):\n{:.2f}, {:.2f}'.format(
+                                            reproj_error.mean(), reproj_error.std()),
+                                        horizontalalignment='center', verticalalignment='center',
+                                        transform=ax2.transAxes, fontsize=16)
 
     # Calcul des mnts points pix
     if sc_uv_mnt_from_geo is not None:
@@ -233,6 +273,8 @@ height, width, _ = img.shape
 
 # read gcps points
 df_gcps, xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo = read_gcps(f_gcps, georef_params_init)
+x_gcps_from_pix = xyz_gcps_from_pix[0, :]
+y_gcps_from_pix = xyz_gcps_from_pix[1, :]
 
 # read mnt drone
 mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
@@ -256,6 +298,9 @@ sc_uv_gcps = None
 sc_uv_gcps_from_geo = None
 sc_geo_gcps = None
 sc_geo_gcps_from_pix = None
+sc_err_reproj = None
+txt_err_reproj = None
+txt_err_reproj_stats = None
 sc_geo_mnt = None
 sc_uv_mnt_from_geo = None
 flag_refresh = True
