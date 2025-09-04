@@ -2,84 +2,14 @@ import json
 from nicegui import ui
 from georef.in_out import CameraParameters, read_json_file
 import numpy as np
-import cv2
 from copy import copy
-import pandas as pd
 from nicegui.element import Element
-from pyproj import Transformer
 from georef.operators import Georef, IntrinsicMatrix
-import georaster
-import tifffile
 import io
 import base64
+from read_inputs import read_ortho, read_img, read_remarkable_pts, read_tif_mnt
+from geo import world_2_pix, compute_xyz_from_pix_and_uv_from_geo
 
-
-def read_ortho(f_ortho):
-
-    # extent of tif file
-    band1 = georaster.SingleBandRaster(f_ortho, load_data=False)
-    extent = band1.extent # xmin, xmax, ymin, ymax
-
-    # get data
-    data = tifffile.imread(f_ortho)
-
-    return extent, data
-
-def read_img(f_img):
-    img = cv2.imread(f_img)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # undistort image
-    img = georef_params.undistort(img)
-    return img
-
-def read_tif_mnt(f_mnt, epsg_mnt, georef_params, ss_ech_factor=2):
-
-    # extent of tif file
-    band1 = georaster.SingleBandRaster(f_mnt, load_data=False)
-    xmin, xmax, ymin, ymax = band1.extent
-
-    # get mnt data
-    data = tifffile.imread(f_mnt)
-
-    # create masked array
-    data = np.ma.array(data, mask=data < -32760)
-
-    # get x, y grid coordinates
-    x = np.linspace(xmin, xmax, data.shape[1])
-    y = np.linspace(ymax, ymin, data.shape[0])
-    x, y = np.meshgrid(x, y)
-    x = x[~data.mask].flatten()
-    y = y[~data.mask].flatten()
-    transformer = Transformer.from_crs(epsg_mnt, georef_params.georef_local_srs.horizontal_srs.srid, always_xy=True)
-    x, y = transformer.transform(x, y)
-
-    # compress data
-    data = data.compressed().flatten()
-
-    # mnt uv from geo
-    u, v = world_2_pix(np.vstack([x, y, data]), georef_params)
-
-    return data[::ss_ech_factor], x[::ss_ech_factor], y[::ss_ech_factor], u[::ss_ech_factor], v[::ss_ech_factor]
-
-def read_remarkable_pts(f_corresp_pts_remarquables):
-    df_corresp_pts_remarquables = pd.read_csv(f_corresp_pts_remarquables,
-                                              usecols=['easting', 'northing', 'elevation', 'U', 'V'])
-    # create U_undist and V_undist
-    undist_pts = cv2.undistortPoints(np.array(df_corresp_pts_remarquables[['U', 'V']]).astype(float),
-                                     georef_params.intrinsic_parameters.camera_matrix,
-                                     georef_params.distortion_coefficients.array,
-                                     P=georef_params.intrinsic_parameters.camera_matrix)
-    undist_pts = undist_pts.reshape((undist_pts.shape[0], undist_pts.shape[2]))
-    df_corresp_pts_remarquables['U_undist'] = undist_pts[:, 0]
-    df_corresp_pts_remarquables['V_undist'] = undist_pts[:, 1]
-
-    # remarkable pts xyz from pix, and uv from geo
-    xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
-        compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
-                                             np.array(
-                                                 df_corresp_pts_remarquables[['easting', 'northing', 'elevation']]),
-                                             georef_params))
-    return df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo
 
 def get_adjustable_elements(georef_params):
     # camera angles
@@ -114,22 +44,6 @@ def get_adjustable_elements(georef_params):
 
     return adjustable_elements
 
-def pix_2_world(uvz, georef_params):
-    # convert pix points to geo local
-    geo_local = georef_params.pix2geo(uvz)
-    geo_world = georef_params.local_srs.m_w_l @ geo_local
-    return geo_world
-
-def world_2_pix(xyz, georef_params):
-    geo_local = georef_params.local_srs.m_l_w @ xyz
-    u, v = georef_params.geo2pix(geo_local)
-    return u ,v
-
-def compute_xyz_from_pix_and_uv_from_geo(uvz, xyz, georef_params):
-    xyz_from_pix = pix_2_world(uvz, georef_params)
-    u, v = world_2_pix(xyz, georef_params)
-    return xyz_from_pix, u, v
-
 def toggle_scatter_remarkables():
     global sc_uv_rkables
     global sc_uv_rkables_from_geo
@@ -156,7 +70,8 @@ def toggle_scatter_remarkables():
         sc_geo_rkables_from_pix.remove()
         sc_geo_rkables_from_pix = None
         reset_sliders()
-
+    set_sc_axis_limits(ax1, 0, width, 0, height, reverse_yaxis=True, margin=300)
+    set_sc_axis_limits(ax2, extent_ortho[0], extent_ortho[1], extent_ortho[2], extent_ortho[3], margin=5)
     ax1.legend(fontsize=16)
     ax2.legend(fontsize=16)
 
@@ -171,14 +86,15 @@ def toggle_mnt():
         sc_geo_mnt = ax2.scatter(mnt_x, mnt_y, c=mnt_z, cmap='RdYlBu_r', s=6, label='mnt drone')
         ax1.set_xlim([2100, 2390])
         ax1.set_ylim([1100, 1330])
-        ax1.yaxis.set_inverted(True)
     else:
         # Supprimer le scatter existant
         sc_geo_mnt.remove()
         sc_geo_mnt = None
         sc_uv_mnt_from_geo.remove()
         sc_uv_mnt_from_geo = None
-
+        reset_sliders()
+    set_sc_axis_limits(ax1, 0, width, 0, height, reverse_yaxis=True, margin=25)
+    set_sc_axis_limits(ax2, extent_ortho[0], extent_ortho[1], extent_ortho[2], extent_ortho[3], margin=5)
     ax2.legend(fontsize=16)
     optimized_update_plot()
 
@@ -193,13 +109,18 @@ def update_plot(value, key, i_key):
     # compute new extrinsinc parameters if necessary
     if key in ['orig', 'angles']:
         # Calculer le nouveau georef_params
+        import time
+        t0 = time.time()
         updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(adjustable_elements['orig'],
                                                                              adjustable_elements['angles'])
+        t1 = time.time()
+        print('pouet: %s' %(t1 - t0))
         georef_params.extrinsic = updated_georef
     # compute new intrinsinc parameters (focal lengths) if necessary
     elif key == 'focal':
         intrinsinc = IntrinsicMatrix(value, value, georef_params.intrinsic.cx, georef_params.intrinsic.cy)
         georef_params.intrinsic = intrinsinc
+        print(georef_params.intrinsic)
 
     # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
     if sc_uv_rkables is not None:
@@ -229,12 +150,14 @@ def add_slider(sliders, label, key, i_key, dminmax, step):
 
 def reset_sliders():
     global flag_refresh
+    global georef_params
     flag_refresh = False
     for name, slider in sliders.items():
         key = name.split('_')[0]
         i_key = int(name.split('_')[1])
         slider.value = adjustable_elements[key + '_init'][i_key]
     flag_refresh = True
+    georef_params = georef_params_init
 
 def write_adjusted_camera_parameters():
 
@@ -254,6 +177,45 @@ def write_adjusted_camera_parameters():
     with open("adjusted_camera_parameters.json", "w") as f:
         f.write(json_str)
 
+def optimized_update_plot():
+    global plot
+    with io.BytesIO() as output:
+        plot.figure.savefig(output, format='jpg')
+        output.seek(0)
+        img_base64 = base64.b64encode(output.read()).decode()
+        plot._props['innerHTML'] = f'<img src="data:image/jpeg;base64,{img_base64}" />'
+    Element.update(plot)
+
+def set_sc_axis_limits(ax, xmin_orig, xmax_orig, ymin_orig, ymax_orig, reverse_yaxis=False, margin=50):
+    # Récupérer tous les PathCollection de l'axe (scatter = PathCollection)
+    from matplotlib.collections import PathCollection
+    all_offsets = []
+    for coll in ax.collections:
+        if isinstance(coll, PathCollection):  # ✅ correction ici
+            offsets = coll.get_offsets()
+            if len(offsets) > 0:
+                all_offsets.append(offsets)
+
+    # Si on a trouvé des points scatter, recalculer les bornes
+    if all_offsets:
+        all_offsets = np.vstack(all_offsets)  # concatène tous les points
+        # Limites avec marge mais bornées à l'image
+        x_min = max(xmin_orig, all_offsets[:, 0].min() - margin)
+        x_max = min(xmax_orig, all_offsets[:, 0].max() + margin)
+        y_min = max(ymin_orig, all_offsets[:, 1].min() - margin)
+        y_max = min(ymax_orig, all_offsets[:, 1].max() + margin)
+        print()
+        ax.set_xlim(x_min, x_max)
+        if reverse_yaxis:
+            ax.set_ylim(y_max, y_min)  # y axis inversion
+        else:
+            ax.set_ylim(y_min, y_max)
+    else:
+        ax.set_xlim(xmin_orig, xmax_orig)
+        if reverse_yaxis:
+            ax.set_ylim(ymax_orig, ymin_orig)  # y axis inversion
+        else:
+            ax.set_ylim(ymin_orig, ymax_orig)
 
 # parameters
 f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_central2_2fps_600s_20240223_14_00.jpg'
@@ -268,29 +230,21 @@ extent_ortho, data_ortho = read_ortho(f_ortho)
 
 # get georef parameters
 georef_params = Georef.from_param_file(f_camera_parameters)
+georef_params_init = copy(georef_params)
 
 # get camera angles
 adjustable_elements = get_adjustable_elements(georef_params)
 
 # read raw image
-img = read_img(f_img)
+img = read_img(f_img, georef_params_init)
+height, width, _ = img.shape
 
 # read remarkable points in correspondance file
-df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = read_remarkable_pts(f_corresp_pts_remarquables)
+df_corresp_pts_remarquables, xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
+    read_remarkable_pts(f_corresp_pts_remarquables, georef_params_init))
 
 # read mnt drone
 mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
-
-
-def optimized_update_plot():
-    global plot
-    with io.BytesIO() as output:
-        plot.figure.savefig(output, format='jpg')
-        output.seek(0)
-        img_base64 = base64.b64encode(output.read()).decode()
-        plot._props['innerHTML'] = f'<img src="data:image/jpeg;base64,{img_base64}" />'
-    Element.update(plot)
-
 
 # plot raw and ortho images
 with ui.matplotlib(figsize=(20, 12), tight_layout=True) as plot:
@@ -305,9 +259,6 @@ with ui.matplotlib(figsize=(20, 12), tight_layout=True) as plot:
     ax2.set_xlim([298245, 298295])
     ax2.set_ylim([5509940, 5509990])
     optimized_update_plot()
-
-
-
 
 # Variables pour stocker les scatters
 sc_uv_rkables = None
