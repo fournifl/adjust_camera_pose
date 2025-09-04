@@ -137,7 +137,7 @@ def add_slider(sliders, label, key, i_key, dminmax, step):
     sliders[f'{key}_{i_key}'] = ui.slider(min=initial_camera_params[f'{key}'][i_key] - dminmax,
                                           max=initial_camera_params[f'{key}'][i_key] + dminmax,
                                           value=initial_camera_params[f'{key}'][i_key], step=step,
-                                          on_change=lambda e: update_plot())
+                                          on_change=lambda e: update_plot()).props('label')
     return sliders
 
 def reset_sliders():
@@ -285,6 +285,11 @@ ui.add_head_html('''
             --nicegui-default-padding: 0.5rem;
             --nicegui-default-gap: 0.2rem;
         }
+        .q-slider__label {
+    font-size: 20px !important;  /* taille du texte */
+    font-weight: bold;           /* facultatif, mettre en gras */
+    color: darkblue;             /* changer la couleur */
+}
     </style>
 ''')
 sliders = {}
