@@ -98,41 +98,36 @@ def toggle_mnt():
     ax2.legend(fontsize=16)
     optimized_update_plot()
 
-def update_plot(value, key, i_key):
+def update_plot():
     global flag_refresh
     if not flag_refresh:
         return
 
-    # get value from slider, and apply it to the corresponding adjustable element
-    adjustable_elements[key][i_key] = value
+    # get values from sliders and reconstruct georef params (extrinsinc, intrinsic)
 
-    # compute new extrinsinc parameters if necessary
-    if key in ['orig', 'angles']:
-        # Calculer le nouveau georef_params
-        import time
-        t0 = time.time()
-        updated_georef = georef_params.extrinsic.from_origin_beachcam_angles(adjustable_elements['orig'],
-                                                                             adjustable_elements['angles'])
-        t1 = time.time()
-        print('pouet: %s' %(t1 - t0))
-        georef_params.extrinsic = updated_georef
-    # compute new intrinsinc parameters (focal lengths) if necessary
-    elif key == 'focal':
-        intrinsinc = IntrinsicMatrix(value, value, georef_params.intrinsic.cx, georef_params.intrinsic.cy)
-        georef_params.intrinsic = intrinsinc
-        print(georef_params.intrinsic)
+    # extrinsinc params
+    angles = np.array([sliders[f'angles_{i_angle}'].value for i_angle in range(3)])
+    camera_position = np.array([sliders[f'orig_{i_orig}'].value for i_orig in range(3)])
+    extrinsinc = georef_params.extrinsic.from_origin_beachcam_angles(camera_position, angles)
+    georef_params.extrinsic = extrinsinc
 
-    # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix en fonction du slider
+    # intrinsinc params
+    intrinsinc = IntrinsicMatrix(sliders['focal_0'].value, sliders['focal_0'].value, georef_params.intrinsic.cx,
+                                 georef_params.intrinsic.cy)
+    georef_params.intrinsic = intrinsinc
+
+    # Calcul de uv_remarkables_from_geo et xyz_remarkables_from_pix
     if sc_uv_rkables is not None:
         xyz_remarkables_from_pix, u_remarkables_from_geo, v_remarkables_from_geo = (
             compute_xyz_from_pix_and_uv_from_geo(df_corresp_pts_remarquables[['U', 'V', 'elevation']],
                                                  np.array(df_corresp_pts_remarquables[
-                                                                          ['easting', 'northing', 'elevation']]),
+                                                              ['easting', 'northing', 'elevation']]),
                                                  georef_params))
-
         # Mise à jour des scatter plots
         sc_uv_rkables_from_geo.set_offsets(np.c_[u_remarkables_from_geo, v_remarkables_from_geo])
         sc_geo_rkables_from_pix.set_offsets(np.c_[xyz_remarkables_from_pix[0, :], xyz_remarkables_from_pix[1, :]])
+
+    # Calcul des mnts points pix
     if sc_uv_mnt_from_geo is not None:
         mnt_u_from_geo, mnt_v_from_geo = world_2_pix(np.vstack([mnt_x, mnt_y, mnt_z]), georef_params)
         # Mise à jour des scatter plots
@@ -140,12 +135,13 @@ def update_plot(value, key, i_key):
 
     optimized_update_plot()
 
+
 def add_slider(sliders, label, key, i_key, dminmax, step):
     ui.label(label)
     sliders[f'{key}_{i_key}'] = ui.slider(min=adjustable_elements[f'{key}_init'][i_key] - dminmax,
                                           max=adjustable_elements[f'{key}_init'][i_key] + dminmax,
                                           value=adjustable_elements[key][i_key], step=step,
-                                          on_change=lambda e: update_plot(e.value, key, i_key)).props('label')
+                                          on_change=lambda e: update_plot())
     return sliders
 
 def reset_sliders():
