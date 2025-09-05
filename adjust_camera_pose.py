@@ -12,7 +12,7 @@ from geo import world_2_pix, compute_xyz_from_pix_and_uv_from_geo, reprojection_
 from adjustText import adjust_text
 
 
-def get_initial_camera_params(georef_params):
+def get_initial_slider_values(georef_params):
     # camera angles
     cam_angles = georef_params.extrinsic.beachcam_angles
     cam_angles_init_tmp = copy(cam_angles)
@@ -176,9 +176,9 @@ def update_plot():
 
 def add_slider(sliders, label, key, i_key, dminmax, step):
     ui.label(label)
-    sliders[f'{key}_{i_key}'] = ui.slider(min=initial_camera_params[f'{key}'][i_key] - dminmax,
-                                          max=initial_camera_params[f'{key}'][i_key] + dminmax,
-                                          value=initial_camera_params[f'{key}'][i_key], step=step,
+    sliders[f'{key}_{i_key}'] = ui.slider(min=initial_sliders_values[f'{key}'][i_key] - dminmax,
+                                          max=initial_sliders_values[f'{key}'][i_key] + dminmax,
+                                          value=initial_sliders_values[f'{key}'][i_key], step=step,
                                           on_change=lambda e: update_plot()).props('label')
     return sliders
 
@@ -189,7 +189,7 @@ def reset_sliders():
     for name, slider in sliders.items():
         key = name.split('_')[0]
         i_key = int(name.split('_')[1])
-        slider.value = initial_camera_params[key][i_key]
+        slider.value = initial_sliders_values[key][i_key]
     flag_refresh = True
     georef_params = georef_params_init
 
@@ -268,8 +268,8 @@ extent_ortho, data_ortho = read_ortho(f_ortho)
 georef_params = Georef.from_param_file(f_camera_parameters)
 georef_params_init = copy(georef_params)
 
-# get camera angles
-initial_camera_params = get_initial_camera_params(georef_params)
+# get initial sliders values (angles, origin, focal)
+initial_sliders_values = get_initial_slider_values(georef_params)
 
 # read raw image
 img = read_img(f_img, georef_params_init)
