@@ -1,15 +1,17 @@
 import json
-from nicegui import ui
-from georef.in_out import CameraParameters, read_json_file
-import numpy as np
-from copy import copy
-from nicegui.element import Element
-from georef.operators import Georef, IntrinsicMatrix
 import io
 import base64
+import numpy as np
+from copy import copy
+from nicegui import ui
+from nicegui.element import Element
+from matplotlib.collections import PathCollection
+from adjustText import adjust_text
+from georef.in_out import CameraParameters, read_json_file
+from georef.operators import Georef, IntrinsicMatrix
 from read_inputs import read_ortho, read_img, read_gcps, read_tif_mnt
 from geo import world_2_pix, compute_xyz_from_pix_and_uv_from_geo, reprojection_error
-from adjustText import adjust_text
+
 
 
 def get_initial_slider_values(georef_params):
@@ -222,7 +224,6 @@ def optimized_update_plot():
 
 def set_sc_axis_limits(ax, xmin_orig, xmax_orig, ymin_orig, ymax_orig, reverse_yaxis=False, margin=50):
     # Récupérer tous les PathCollection de l'axe (scatter = PathCollection)
-    from matplotlib.collections import PathCollection
     all_offsets = []
     for coll in ax.collections:
         if isinstance(coll, PathCollection):  # ✅ correction ici
@@ -251,102 +252,104 @@ def set_sc_axis_limits(ax, xmin_orig, xmax_orig, ymin_orig, ymax_orig, reverse_y
         else:
             ax.set_ylim(ymin_orig, ymax_orig)
 
-# parameters
-f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_central2_2fps_600s_20240223_14_00.jpg'
-# f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
-f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS_2024/gcps_CAM44.csv'
-f_camera_parameters = 'camera_parameters_cam44.json'
-# f_camera_parameters = 'camera_parameters_cam44_orig.json'
-f_ortho = '/home/florent/Projects/Etretat/Geodesie/orthophoto_2025.tif'
-f_mnt = '/home/florent/Projects/Etretat/Geodesie/MNT_drone/03_etretat_20210402_DEM_selection_groyne_medium.tif'
+if __name__ == '__main__':
+
+    # parameters
+    f_img = '/home/florent/Projects/Etretat/Etretat_central2/images/raw/A_Etretat_central2_2fps_600s_20240223_14_00.jpg'
+    # f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS/GCPS_20200113/fichier_correspondances_Etretat_gcp_mars_2020_avec_images_before_march_2024.csv'
+    f_gcps = '/home/florent/Projects/Etretat/Geodesie/GCPS_2024/gcps_CAM44.csv'
+    f_camera_parameters = 'camera_parameters_cam44.json'
+    # f_camera_parameters = 'camera_parameters_cam44_orig.json'
+    f_ortho = '/home/florent/Projects/Etretat/Geodesie/orthophoto_2025.tif'
+    f_mnt = '/home/florent/Projects/Etretat/Geodesie/MNT_drone/03_etretat_20210402_DEM_selection_groyne_medium.tif'
 
 
-# read ortho
-extent_ortho, data_ortho = read_ortho(f_ortho)
+    # read ortho
+    extent_ortho, data_ortho = read_ortho(f_ortho)
 
-# get georef parameters
-georef_params = Georef.from_param_file(f_camera_parameters)
-georef_params_init = copy(georef_params)
+    # get georef parameters
+    georef_params = Georef.from_param_file(f_camera_parameters)
+    georef_params_init = copy(georef_params)
 
-# get initial sliders values (angles, origin, focal)
-initial_sliders_values = get_initial_slider_values(georef_params)
+    # get initial sliders values (angles, origin, focal)
+    initial_sliders_values = get_initial_slider_values(georef_params)
 
-# read raw image
-img = read_img(f_img, georef_params_init)
-height, width, _ = img.shape
+    # read raw image
+    img = read_img(f_img, georef_params_init)
+    height, width, _ = img.shape
 
-# read gcps points
-df_gcps, xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo = read_gcps(f_gcps, georef_params_init)
-x_gcps_from_pix = xyz_gcps_from_pix[0, :]
-y_gcps_from_pix = xyz_gcps_from_pix[1, :]
+    # read gcps points
+    df_gcps, xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo = read_gcps(f_gcps, georef_params_init)
+    x_gcps_from_pix = xyz_gcps_from_pix[0, :]
+    y_gcps_from_pix = xyz_gcps_from_pix[1, :]
 
-# read mnt drone
-mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
+    # read mnt drone
+    mnt_z, mnt_x, mnt_y, mnt_u_from_geo, mnt_v_from_geo = read_tif_mnt(f_mnt, 2154, georef_params)
 
-# plot raw and ortho images
-with ui.matplotlib(figsize=(20, 12), tight_layout=True) as plot:
-    ax1 = plot.figure.add_subplot(121)
-    ax1.imshow(img)
-    ax1.axes.get_xaxis().set_ticks([])
-    ax1.axes.get_yaxis().set_ticks([])
-    ax2 = plot.figure.add_subplot(122)
-    ax2.imshow(data_ortho, extent=extent_ortho, aspect='equal')
-    ax2.axes.get_xaxis().set_ticks([])
-    ax2.axes.get_yaxis().set_ticks([])
-    ax2.set_xlim([298245, 298295])
-    ax2.set_ylim([5509940, 5509990])
-    optimized_update_plot()
+    # plot raw and ortho images
+    with ui.matplotlib(figsize=(20, 12), tight_layout=True) as plot:
+        ax1 = plot.figure.add_subplot(121)
+        ax1.imshow(img)
+        ax1.axes.get_xaxis().set_ticks([])
+        ax1.axes.get_yaxis().set_ticks([])
+        ax2 = plot.figure.add_subplot(122)
+        ax2.imshow(data_ortho, extent=extent_ortho, aspect='equal')
+        ax2.axes.get_xaxis().set_ticks([])
+        ax2.axes.get_yaxis().set_ticks([])
+        ax2.set_xlim([298245, 298295])
+        ax2.set_ylim([5509940, 5509990])
+        optimized_update_plot()
 
-# Variables pour stocker les scatters
-sc_uv_gcps = None
-sc_uv_gcps_from_geo = None
-sc_geo_gcps = None
-sc_geo_gcps_from_pix = None
-sc_err_reproj = None
-txt_err_reproj = None
-txt_err_reproj_stats = None
-sc_geo_mnt = None
-sc_uv_mnt_from_geo = None
-flag_refresh = True
+    # Variables pour stocker les scatters
+    sc_uv_gcps = None
+    sc_uv_gcps_from_geo = None
+    sc_geo_gcps = None
+    sc_geo_gcps_from_pix = None
+    sc_err_reproj = None
+    txt_err_reproj = None
+    txt_err_reproj_stats = None
+    sc_geo_mnt = None
+    sc_uv_mnt_from_geo = None
+    flag_refresh = True
 
-# Buttons NiceGUI
-with ui.button_group().classes('mx-auto'):
+    # Buttons NiceGUI
+    with ui.button_group().classes('mx-auto'):
 
-    # bouton points gcps
-    button_gcps = ui.button('gcps pts', on_click=toggle_scatter_gcps)
-    button_gcps.style('width: 200px; height: 20px; font-size: 15px;')
+        # bouton points gcps
+        button_gcps = ui.button('gcps pts', on_click=toggle_scatter_gcps)
+        button_gcps.style('width: 200px; height: 20px; font-size: 15px;')
 
-    # bouton mnt drone
-    button_topo_pts = ui.button('mnt drone', on_click=toggle_mnt)
-    button_topo_pts.style('width: 200px; height: 20px; font-size: 15px;')
+        # bouton mnt drone
+        button_topo_pts = ui.button('mnt drone', on_click=toggle_mnt)
+        button_topo_pts.style('width: 200px; height: 20px; font-size: 15px;')
 
-    # bouton save georef
-    button_save_georef = ui.button('save georef', on_click=write_adjusted_camera_parameters)
-    button_save_georef.style('width: 200px; height: 20px; font-size: 15px;')
+        # bouton save georef
+        button_save_georef = ui.button('save georef', on_click=write_adjusted_camera_parameters)
+        button_save_georef.style('width: 200px; height: 20px; font-size: 15px;')
 
 
-# Sliders NiceGUI
-# Ajouter du CSS personnalisé qui s'applique à tous les labels de sliders
-ui.add_head_html('''
-<style>
-        :root {
-            --nicegui-default-padding: 0.5rem;
-            --nicegui-default-gap: 0.2rem;
-        }
-        .q-slider__label {
-    font-size: 20px !important;  /* taille du texte */
-    font-weight: bold;           /* facultatif, mettre en gras */
-    color: darkblue;             /* changer la couleur */
-}
-    </style>
-''')
-sliders = {}
-sliders = add_slider(sliders, label='yaw (°)', key='angles', i_key=0, dminmax=0.5, step=0.01)
-sliders = add_slider(sliders, label='pitch (°)', key='angles', i_key=1, dminmax=1.5, step=0.01)
-sliders = add_slider(sliders, label='roll (°)', key='angles', i_key=2, dminmax=0.5, step=0.01)
-sliders = add_slider(sliders, label="camera's origin x (local coordinates)", key='orig', i_key=0, dminmax=2, step=0.1)
-sliders = add_slider(sliders, label="camera's origin y (local coordinates)", key='orig', i_key=1, dminmax=2.5, step=0.1)
-sliders = add_slider(sliders, label="camera's origin z (local coordinates)", key='orig', i_key=2, dminmax=2.5, step=0.1)
-sliders = add_slider(sliders, label="focal (pixels)", key='focal', i_key=0, dminmax=200, step=5)
+    # Sliders NiceGUI
+    # Ajouter du CSS personnalisé qui s'applique à tous les labels de sliders
+    ui.add_head_html('''
+    <style>
+            :root {
+                --nicegui-default-padding: 0.5rem;
+                --nicegui-default-gap: 0.2rem;
+            }
+            .q-slider__label {
+        font-size: 20px !important;  /* taille du texte */
+        font-weight: bold;           /* facultatif, mettre en gras */
+        color: darkblue;             /* changer la couleur */
+    }
+        </style>
+    ''')
+    sliders = {}
+    sliders = add_slider(sliders, label='yaw (°)', key='angles', i_key=0, dminmax=0.5, step=0.01)
+    sliders = add_slider(sliders, label='pitch (°)', key='angles', i_key=1, dminmax=1.5, step=0.01)
+    sliders = add_slider(sliders, label='roll (°)', key='angles', i_key=2, dminmax=0.5, step=0.01)
+    sliders = add_slider(sliders, label="camera's origin x (local coordinates)", key='orig', i_key=0, dminmax=2, step=0.1)
+    sliders = add_slider(sliders, label="camera's origin y (local coordinates)", key='orig', i_key=1, dminmax=2.5, step=0.1)
+    sliders = add_slider(sliders, label="camera's origin z (local coordinates)", key='orig', i_key=2, dminmax=2.5, step=0.1)
+    sliders = add_slider(sliders, label="focal (pixels)", key='focal', i_key=0, dminmax=200, step=5)
 
-ui.run()
+    ui.run()
