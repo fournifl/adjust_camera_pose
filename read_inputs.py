@@ -4,6 +4,7 @@ import numpy as np
 from pyproj import Transformer
 import georaster
 import tifffile
+import georef
 from geo import world_2_pix, pix_2_world, compute_xyz_from_pix_and_uv_from_geo
 
 def read_ortho(f_ortho):
@@ -72,3 +73,11 @@ def read_gcps(f_gcps, georef_params):
                                                  df_gcps[['easting', 'northing', 'elevation']]),
                                              georef_params))
     return df_gcps, xyz_gcps_from_pix, u_gcps_from_geo, v_gcps_from_geo
+
+def read_litto3d_pts(f_litto3d, georef_params, ss_ech_factor=1):
+    # read csv (x, y, z)
+    df_litto3d_pts = pd.read_csv(f_litto3d)
+    # convert litto3d semi points in u, v coordinates
+    u_litto, v_litto = world_2_pix(df_litto3d_pts[['x', 'y', 'z']], georef_params)
+    return df_litto3d_pts[::ss_ech_factor], u_litto[::ss_ech_factor], v_litto[::ss_ech_factor]
+
